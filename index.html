@@ -358,6 +358,7 @@ function onDataLoaded(){
   buildTableControls();
   renderTable();
   buildPivotFields();
+  buildPivot();
   buildChartControls();
   buildMapControls();
   switchTab('overview');
@@ -460,16 +461,46 @@ function changeTblPage(d){tblPage=Math.max(0,Math.min(tblPage+d,Math.ceil(sorted
 // ═══════════════════════════════════════════════
 // TCD — CONSTRUCTEUR
 // ═══════════════════════════════════════════════
-function isNumericCol(idx){return allRows.slice(0,40).filter(r=>!isNaN(parseFloat(r[idx]))&&r[idx]!=='').length>20;}
+function isNumericCol(idx){
+  // Exclure par nom de colonne : IDs, dates, matricules, codes, trajets texte
+  const h=(allHeaders[idx]||'').toLowerCase();
+  const excludeNames=['no ','n°','num','matricule','date','cde','rc ','sifac','trajet','eotp','centre','cout','coût','orga','code','id','destinat','objet','nom','type','statut','pole','pris en','remarque'];
+  if(excludeNames.some(ex=>h.includes(ex)))return false;
+  // Vérifier que les valeurs sont vraiment des montants : au moins 60% numériques
+  // ET que la valeur médiane est > 0 (pas juste des 0 partout)
+  const sample=allRows.slice(0,60).map(r=>r[idx]).filter(v=>v!==''&&v!==null&&v!==undefined);
+  if(!sample.length)return false;
+  const nums=sample.map(v=>parseFloat(String(v).replace(',','.'))).filter(v=>!isNaN(v));
+  if(nums.length/sample.length<0.6)return false;
+  // Exclure les colonnes où toutes les valeurs sont des entiers longs (≥7 chiffres = ID/matricule)
+  const allLongInt=nums.every(v=>Number.isInteger(v)&&Math.abs(v)>=1000000);
+  if(allLongInt)return false;
+  // Au moins une valeur non nulle
+  return nums.some(v=>v!==0);
+}
 
 function buildPivotFields(){
   const list=document.getElementById('fieldList');
-  list.innerHTML=allHeaders.map((h,i)=>`<div class="field-item${isNumericCol(i)?' numeric':''}" title="${isNumericCol(i)?'Colonne numérique':'Colonne texte'}">${h}</div>`).join('');
+  list.innerHTML=allHeaders.map((h,i)=>`<div class="field-item${isNumericCol(i)?' numeric':''}" title="${isNumericCol(i)?'Colonne numérique (montant)':'Colonne texte / catégorie'}">${h}</div>`).join('');
   const allOpts='<option value="">+ Ajouter un champ</option>'+allHeaders.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
-  const numOpts='<option value="">+ Ajouter une valeur</option>'+allHeaders.map((h,i)=>isNumericCol(i)?`<option value="${i}">${h}</option>`:'').join('')+'<option value="_count">Comptage (nb de lignes)</option>';
+  const numIdxs=allHeaders.map((_,i)=>i).filter(i=>isNumericCol(i));
+  const numOpts='<option value="">+ Ajouter une valeur</option>'+numIdxs.map(i=>`<option value="${i}">${allHeaders[i]}</option>`).join('')+'<option value="_count">Comptage (nb de lignes)</option>';
   document.getElementById('selRows').innerHTML=allOpts;
   document.getElementById('selCols').innerHTML=allOpts;
   document.getElementById('selVals').innerHTML=numOpts;
+  // Pré-remplir avec des valeurs par défaut utiles
+  pvRows=[];pvCols=[];pvVals=[];
+  // Ligne : première colonne texte avec peu de valeurs distinctes (catégorie)
+  const catIdx=allHeaders.findIndex((_,i)=>{
+    if(isNumericCol(i))return false;
+    const uniq=new Set(allRows.slice(0,100).map(r=>r[i]));
+    return uniq.size>=2&&uniq.size<=30;
+  });
+  if(catIdx>=0)pvRows.push({idx:String(catIdx),label:allHeaders[catIdx]});
+  // Valeur : première colonne numérique
+  if(numIdxs.length>0)pvVals.push({idx:String(numIdxs[0]),label:allHeaders[numIdxs[0]]});
+  else pvVals.push({idx:'_count',label:'Comptage'});
+  ['rows','cols','vals'].forEach(z=>renderZoneChips(z));
 }
 
 function addToZone(zone){
@@ -599,10 +630,15 @@ function pvSortToggle(colIdx){
 // ═══════════════════════════════════════════════
 function buildChartControls(){
   const allOpts=allHeaders.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
-  const numOpts=allHeaders.map((h,i)=>isNumericCol(i)?`<option value="${i}">${h}</option>`:'').join('');
+  const numIdxs=allHeaders.map((_,i)=>i).filter(i=>isNumericCol(i));
+  const numOpts=numIdxs.map(i=>`<option value="${i}">${allHeaders[i]}</option>`).join('');
   ['chartX','chartX2'].forEach(id=>document.getElementById(id).innerHTML=allOpts);
   document.getElementById('chartY').innerHTML=numOpts||allOpts;
-  if(allHeaders.length>1)document.getElementById('chartX2').value='1';
+  // Defaults sensés : X=première col texte, X2=deuxième col texte, Y=première col numérique
+  const textIdxs=allHeaders.map((_,i)=>i).filter(i=>!isNumericCol(i));
+  if(textIdxs.length>0)document.getElementById('chartX').value=textIdxs[0];
+  if(textIdxs.length>1)document.getElementById('chartX2').value=textIdxs[1];
+  if(numIdxs.length>0)document.getElementById('chartY').value=numIdxs[0];
   resetAllDrills();
 }
 
