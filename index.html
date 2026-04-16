@@ -48,6 +48,8 @@ tbody tr:last-child td{border:none}tbody tr:hover td{background:var(--bll)}
 .field-list{display:flex;flex-direction:column;gap:3px;max-height:400px;overflow-y:auto}
 .fi{padding:6px 9px;border-radius:var(--r);font-size:12px;font-weight:500;background:var(--sur2);border:1px solid var(--bdr);cursor:default}
 .fi.num{border-left:3px solid var(--bl);color:var(--bl);background:var(--bll)}
+.fi.cpt{border-left:3px solid var(--gn);color:var(--gn);background:var(--gnl)}
+.fi.excl{border-left:3px solid var(--bdr2);color:var(--tx3);opacity:.5}
 .pv-zones{display:flex;flex-direction:column;gap:10px}
 .pv-zone{background:var(--sur);border:1px dashed var(--bdr2);border-radius:var(--rl);padding:10px 12px}
 .pv-zone-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:3px}
@@ -238,22 +240,19 @@ const MONTANT_KEYS = new Set([
   'Total_hebergement',
 ]);
 
-// Colonnes numériques mais PAS des montants (ne pas afficher dans stats/TCD/graphiques)
-const EXCLU_KEYS = new Set([
-  'No_OM',
-  'Trajets_train',
-  'Trajets_avion',
-  'Locations_voiture',
-  'Nombre_de_nuit',
+// Champs à exclure complètement (IDs, codes techniques)
+const EXCLU_KEYS = new Set(['No_OM']);
+
+// Champs numériques utilisables comme VALEURS (compteurs)
+// mais PAS comme catégories Lignes/Colonnes du TCD
+const COMPTEUR_KEYS = new Set([
+  'Trajets_train','Trajets_avion','Locations_voiture','Nombre_de_nuit',
 ]);
 
-function isNum(idx) {
-  return MONTANT_KEYS.has(H[idx]);
-}
-
-function isExclu(idx) {
-  return EXCLU_KEYS.has(H[idx]);
-}
+function isNum(idx)      { return MONTANT_KEYS.has(H[idx]); }
+function isCompteur(idx) { return COMPTEUR_KEYS.has(H[idx]); }
+function isExclu(idx)    { return EXCLU_KEYS.has(H[idx]); }
+function isCat(idx)      { return !isNum(idx) && !isCompteur(idx) && !isExclu(idx); }
 
 // Libellé lisible (remplace _ par espace)
 function lbl(key) {
@@ -429,27 +428,36 @@ function tPage(d){tCurPage=Math.max(0,Math.min(tCurPage+d,Math.ceil(SR.length/PS
 
 // ── TCD ──
 function numIdxs(){return H.map((_,i)=>i).filter(i=>isNum(i));}
-function textIdxs(){return H.map((_,i)=>i).filter(i=>!isNum(i)&&!isExclu(i)&&typeof(R[0]&&R[0][i])!=='object');}
+function allValueIdxs(){return H.map((_,i)=>i).filter(i=>isNum(i)||isCompteur(i));}
+function textIdxs(){return H.map((_,i)=>i).filter(i=>isCat(i)&&typeof(R[0]&&R[0][i])!=='object');}
 
 function buildPivotUI(){
-  // Liste des champs disponibles
-  document.getElementById('fieldList').innerHTML=H.map((h,i)=>`
-    <div class="fi${isNum(i)?' num':''}" title="${isNum(i)?'Montant (numérique)':'Texte / catégorie'}">
-      ${lbl(h)}
-    </div>`).join('');
+  // Liste des champs disponibles — 3 catégories visuelles
+  document.getElementById('fieldList').innerHTML=H.map((h,i)=>{
+    if(isNum(i))     return `<div class="fi num" title="Montant — utilisable en Valeurs">${lbl(h)}</div>`;
+    if(isCompteur(i))return `<div class="fi cpt" title="Compteur — utilisable en Valeurs">${lbl(h)}</div>`;
+    if(isExclu(i))   return `<div class="fi excl" title="Identifiant — non utilisable">${lbl(h)}</div>`;
+    return `<div class="fi" title="Catégorie — utilisable en Lignes/Colonnes">${lbl(h)}</div>`;
+  }).join('');
 
-  // Options select Lignes/Colonnes : tous les champs non-montant
-  const allOpts='<option value="">+ Ajouter un champ</option>'+
-    H.map((h,i)=>!isNum(i)?`<option value="${i}">${lbl(h)}</option>`:'').join('');
+  // Options Lignes/Colonnes : uniquement les vrais champs catégoriels
+  const catOpts='<option value="">+ Ajouter un champ</option>'+
+    H.map((h,i)=>isCat(i)?`<option value="${i}">${lbl(h)}</option>`:'').join('');
 
-  // Options select Valeurs : uniquement les montants + comptage
+  // Options Valeurs : montants + compteurs + comptage (tout sauf IDs et dates)
   const nIdxs=numIdxs();
+  const cIdxs=H.map((_,i)=>i).filter(i=>isCompteur(i));
   const numOpts='<option value="">+ Ajouter une valeur</option>'+
-    nIdxs.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('')+
+    '<optgroup label="Montants (€)">'+
+      nIdxs.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('')+
+    '</optgroup>'+
+    (cIdxs.length?'<optgroup label="Compteurs">'+
+      cIdxs.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('')+
+    '</optgroup>':'')+
     '<option value="_count">Comptage (nb de lignes)</option>';
 
-  document.getElementById('selR').innerHTML=allOpts;
-  document.getElementById('selC').innerHTML=allOpts;
+  document.getElementById('selR').innerHTML=catOpts;
+  document.getElementById('selC').innerHTML=catOpts;
   document.getElementById('selV').innerHTML=numOpts;
 
   // Pré-remplissage : Statut_OM en ligne, Total_hebergement en valeur
@@ -568,9 +576,9 @@ function buildPivot(){
 
 // ── GRAPHIQUES ──
 function buildChartControls(){
-  const tI=textIdxs(),nI=numIdxs();
-  const aOpts=H.map((h,i)=>!isNum(i)?`<option value="${i}">${lbl(h)}</option>`:'').join('');
-  const nOpts=nI.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('');
+  const tI=textIdxs(),nI=numIdxs(),vI=allValueIdxs();
+  const aOpts=H.map((h,i)=>isCat(i)?`<option value="${i}">${lbl(h)}</option>`:'').join('');
+  const nOpts=vI.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('');
   ['cX','cX2'].forEach(id=>document.getElementById(id).innerHTML=aOpts);
   document.getElementById('cY').innerHTML=nOpts;
   // Defaults : Statut_OM / Type_OM / Total_hebergement
