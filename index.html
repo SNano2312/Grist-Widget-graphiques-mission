@@ -1,125 +1,747 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-body{font-family:monospace;font-size:13px;padding:20px;background:#f5f5f5}
-h2{font-family:sans-serif;margin-bottom:12px}
-.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;margin-bottom:14px}
-table{border-collapse:collapse;width:100%}
-th{background:#eee;padding:6px 10px;text-align:left;border:1px solid #ccc;font-size:11px}
-td{padding:5px 10px;border:1px solid #ddd;font-size:12px;white-space:nowrap}
-.num{color:#1B4FBF;font-weight:600}
-.txt{color:#555}
-.badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px}
-.bn{background:#EEF2FB;color:#1B4FBF}
-.bt{background:#F0EEE9;color:#555}
-pre{background:#1e1e1e;color:#d4d4d4;padding:14px;border-radius:6px;overflow:auto;font-size:11px;max-height:300px}
+:root{--bg:#F7F6F3;--sur:#fff;--sur2:#F0EEE9;--bdr:#E2DED6;--bdr2:#CBC6BC;--tx:#1A1916;--tx2:#6B6760;--tx3:#9B9690;--bl:#1B4FBF;--bll:#EEF2FB;--blm:#6B8ED6;--gn:#1A7A4A;--gnl:#EBF5F0;--r:8px;--rl:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;font-size:14px;color:var(--tx);background:var(--bg)}
+.shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:10px;padding:0 20px;height:50px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-shrink:0}
+.topbar-title{font-size:15px;font-weight:600}
+.tb-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:var(--bll);color:var(--bl)}
+.tabs-bar{display:flex;padding:0 20px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-shrink:0;overflow-x:auto}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--tx2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+.tab:hover{color:var(--tx)}.tab.active{color:var(--bl);border-bottom-color:var(--bl)}
+.content{flex:1;overflow-y:auto;padding:20px}
+.panel{display:none}.panel.active{display:block}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:14px;color:var(--tx2)}
+.spinner{width:30px;height:30px;border:3px solid var(--bdr2);border-top-color:var(--bl);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.stat-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px 16px}
+.stat-label{font-size:11px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.stat-val{font-size:24px;font-weight:600;letter-spacing:-.4px}
+.stat-sub{font-size:11px;color:var(--tx3);margin-top:3px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:var(--r);border:1px solid var(--bdr2);background:var(--sur);cursor:pointer;font-size:13px;font-weight:500;color:var(--tx);font-family:inherit;transition:background .1s}
+.btn:hover{background:var(--sur2)}.btn.primary{background:var(--bl);color:#fff;border-color:var(--bl)}.btn.primary:hover{background:#163FA0}
+.btn.sm{padding:3px 9px;font-size:12px}
+select,input[type=text]{padding:6px 10px;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--sur);color:var(--tx);font-size:13px;font-family:inherit;outline:none}
+select:focus,input[type=text]:focus{border-color:var(--bl)}
+label{font-size:12px;font-weight:500;color:var(--tx2);display:block;margin-bottom:3px}
+.tbl-wrap{border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden;background:var(--sur)}
+table{width:100%;border-collapse:collapse;font-size:12px;font-family:'DM Mono',monospace}
+thead th{background:var(--sur2);padding:7px 11px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--tx2);border-bottom:1px solid var(--bdr);white-space:nowrap;position:sticky;top:0;z-index:1;cursor:pointer;user-select:none}
+thead th:hover{background:#E5E2DB}
+thead th.sa::after{content:' ↑'}thead th.sd::after{content:' ↓'}
+tbody td{padding:6px 11px;border-bottom:1px solid var(--bdr);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+tbody tr:last-child td{border:none}tbody tr:hover td{background:var(--bll)}
+.pager{display:flex;align-items:center;gap:8px;padding:7px 13px;border-top:1px solid var(--bdr);background:var(--sur2);font-size:12px;color:var(--tx2)}
+.pager-info{flex:1}
+.pv-builder{display:grid;grid-template-columns:200px 1fr;gap:14px;margin-bottom:14px}
+.pv-fields{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:12px}
+.pv-fields-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:8px}
+.field-list{display:flex;flex-direction:column;gap:3px;max-height:400px;overflow-y:auto}
+.fi{padding:6px 9px;border-radius:var(--r);font-size:12px;font-weight:500;background:var(--sur2);border:1px solid var(--bdr);cursor:default}
+.fi.num{border-left:3px solid var(--bl);color:var(--bl);background:var(--bll)}
+.pv-zones{display:flex;flex-direction:column;gap:10px}
+.pv-zone{background:var(--sur);border:1px dashed var(--bdr2);border-radius:var(--rl);padding:10px 12px}
+.pv-zone-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:3px}
+.pv-zone-desc{font-size:11px;color:var(--tx3);font-style:italic;margin-bottom:6px}
+.zone-chips{display:flex;flex-wrap:wrap;gap:5px;min-height:24px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:500;background:var(--bll);color:var(--bl);border:1px solid var(--blm)}
+.chip.num{background:var(--gnl);color:var(--gn);border-color:#7CC4A0}
+.chip .x{cursor:pointer;opacity:.6;font-size:13px}.chip .x:hover{opacity:1}
+.pv-table-wrap{overflow:auto;border:1px solid var(--bdr);border-radius:var(--rl);max-height:500px}
+.pvt{border-collapse:collapse;font-size:12px;font-family:'DM Mono',monospace}
+.pvt th{background:var(--sur2);padding:7px 11px;border:1px solid var(--bdr);font-weight:600;font-size:11px;white-space:nowrap;text-align:center;color:var(--tx2);cursor:pointer;position:sticky;top:0;z-index:1}
+.pvt th:hover{background:#E0DDD7}.pvt th.rh{text-align:left}
+.pvt td{padding:6px 11px;border:1px solid var(--bdr);text-align:right;white-space:nowrap;position:relative;min-width:70px}
+.pvt td.rl{text-align:left;font-weight:500;background:var(--sur2);position:sticky;left:0;z-index:1}
+.pvt tr.tr-total td{background:var(--bl);color:#fff;font-weight:600}
+.pvt tr.tr-total td.rl{background:var(--bl);color:#fff}
+.pvt td.tc{background:var(--bll);font-weight:600;color:var(--bl)}
+.pvt tr.tr-total td.tc{background:#0F3A9A;color:#fff}
+.hbar{position:absolute;left:0;top:0;height:100%;opacity:.13;pointer-events:none}
+.cv{position:relative;z-index:1}
+.ch-controls{display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap}
+.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.ch-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px}
+.ch-card.drilled{border-color:var(--bl);border-width:1.5px}
+.ch-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ch-title{font-size:12px;font-weight:600;color:var(--tx2)}
+canvas{max-height:240px;cursor:pointer}
+.bc{display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px;flex-wrap:wrap}
+.bc a{color:var(--bl);cursor:pointer;text-decoration:underline}
+.bc a.cur{color:var(--tx);text-decoration:none;cursor:default;font-weight:500}
+.bc-sep{color:var(--tx3)}
+.drill-hint{font-size:11px;color:var(--tx3);margin-bottom:10px;font-style:italic}
+#mapEl{height:480px;border-radius:var(--rl);border:1px solid var(--bdr);overflow:hidden}
+.map-legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:9px 13px;background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rl);margin-top:10px;font-size:12px}
+.gbar{height:3px;background:var(--bdr);border-radius:2px;margin:5px 0;overflow:hidden}
+.gfill{height:100%;background:var(--bl);border-radius:2px;transition:width .3s}
+.empty{text-align:center;padding:48px;color:var(--tx3);font-size:13px}
+@media(max-width:700px){.ch-grid{grid-template-columns:1fr}.pv-builder{grid-template-columns:1fr}}
 </style></head>
 <body>
-<h2>🔍 Diagnostic Widget Grist</h2>
-
-<div class="card">
-  <b>Statut connexion Grist</b><br>
-  <span id="gristStatus">En attente…</span>
+<div class="shell">
+<div class="topbar">
+  <div class="topbar-title">Analyse des Ordres de Mission</div>
+  <span class="tb-badge" id="topBadge">Chargement…</span>
+  <span id="lastUpdate" style="margin-left:auto;font-size:11px;color:var(--tx3)"></span>
 </div>
-
-<div class="card">
-  <b>Colonnes reçues de Grist</b> — <span id="colCount"></span><br><br>
-  <table id="colTable">
-    <thead><tr><th>#</th><th>Nom exact (H[])</th><th>Nom lowercase</th><th>Type JS de la 1ère valeur</th><th>1ère valeur</th><th>2ème valeur</th><th>isNum()?</th></tr></thead>
-    <tbody id="colBody"></tbody>
-  </table>
+<div class="tabs-bar">
+  <div class="tab active" onclick="go('overview')">Vue d'ensemble</div>
+  <div class="tab" onclick="go('table')">Table</div>
+  <div class="tab" onclick="go('pivot')">TCD</div>
+  <div class="tab" onclick="go('charts')">Graphiques</div>
+  <div class="tab" onclick="go('map');initMap()">Carte</div>
 </div>
+<div class="content">
+  <div class="loading" id="loadingEl"><div class="spinner"></div><div>Connexion à Grist…</div></div>
 
-<div class="card">
-  <b>Données brutes — 3 premières lignes (JSON)</b><br><br>
-  <pre id="rawJson">…</pre>
-</div>
+  <div class="panel" id="panel-overview">
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="card"><div class="card-title">Aperçu — 20 premières lignes</div>
+      <div class="tbl-wrap"><div style="max-height:320px;overflow:auto"><table id="ovTable"></table></div></div>
+    </div>
+  </div>
 
-<div class="card">
-  <b>Test isNum() avec les noms exacts de vos colonnes</b><br>
-  <div id="numTest"></div>
-</div>
+  <div class="panel" id="panel-table">
+    <div class="card" style="padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><label>Recherche globale</label><input type="text" id="tSearch" placeholder="Mot-clé…" oninput="doFilter()" style="width:220px"></div>
+      <div><label>Filtrer colonne</label><select id="tColF" onchange="doFilter()" style="width:200px"><option value="">— toutes —</option></select></div>
+      <div><label>Valeur</label><input type="text" id="tValF" placeholder="…" oninput="doFilter()" style="width:160px"></div>
+      <span id="tCount" style="font-size:12px;color:var(--tx3);margin-left:auto;margin-top:18px"></span>
+    </div>
+    <div class="tbl-wrap">
+      <div style="max-height:calc(100vh - 270px);overflow:auto"><table id="mainTable"></table></div>
+      <div class="pager"><span class="pager-info" id="tPagerInfo"></span><button class="btn sm" id="tPrev" onclick="tPage(-1)">← Préc.</button><button class="btn sm" id="tNext" onclick="tPage(1)">Suiv. →</button></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-pivot">
+    <div class="card">
+      <div class="card-title">Tableau Croisé Dynamique</div>
+      <p style="font-size:12px;color:var(--tx2);margin-bottom:12px">Champs <span style="color:var(--bl);font-weight:600;background:var(--bll);padding:1px 6px;border-radius:4px">en bleu</span> = montants. Ajoutez des champs dans chaque zone.</p>
+      <div class="pv-builder">
+        <div class="pv-fields"><div class="pv-fields-title">Champs disponibles</div><div class="field-list" id="fieldList"></div></div>
+        <div class="pv-zones">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="pv-zone">
+              <div class="pv-zone-title">↕ Lignes</div>
+              <div class="pv-zone-desc">Ex : Statut_OM, Type_OM, Orga, Demande_avance…</div>
+              <div class="zone-chips" id="zRows"></div>
+              <select id="selR" onchange="addZone('r')" style="margin-top:7px;width:100%"><option value="">+ Ajouter un champ</option></select>
+            </div>
+            <div class="pv-zone">
+              <div class="pv-zone-title">↔ Colonnes</div>
+              <div class="pv-zone-desc">Ex : Type_resa, Statut_avance, Type_OM…</div>
+              <div class="zone-chips" id="zCols"></div>
+              <select id="selC" onchange="addZone('c')" style="margin-top:7px;width:100%"><option value="">+ Ajouter un champ</option></select>
+            </div>
+          </div>
+          <div class="pv-zone">
+            <div class="pv-zone-title">∑ Valeurs à calculer</div>
+            <div class="pv-zone-desc">Montants disponibles : Total_train, Total_avion, Total_hebergement, Montant_avance, Total_IJ_non_degreves… ou Comptage</div>
+            <div class="zone-chips" id="zVals"></div>
+            <select id="selV" onchange="addZone('v')" style="margin-top:7px;width:280px"><option value="">+ Ajouter une valeur</option></select>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div><label>Agrégation</label>
+          <select id="pvAgg" onchange="buildPivot()">
+            <option value="sum">Somme</option>
+            <option value="count">Comptage (nb de lignes)</option>
+            <option value="avg">Moyenne</option>
+            <option value="min">Minimum</option>
+            <option value="max">Maximum</option>
+          </select>
+        </div>
+        <div><label>Heatmap</label>
+          <select id="pvHeat" onchange="buildPivot()">
+            <option value="row">Par ligne</option>
+            <option value="col">Par colonne</option>
+            <option value="all">Globale</option>
+            <option value="none">Aucune</option>
+          </select>
+        </div>
+        <button class="btn sm" onclick="resetPivot()" style="margin-top:18px">Réinitialiser</button>
+      </div>
+    </div>
+    <div id="pvResult"></div>
+  </div>
+
+  <div class="panel" id="panel-charts">
+    <div class="card">
+      <div class="ch-controls">
+        <div><label>Axe X — Niveau 1</label><select id="cX" onchange="resetDrills()"></select></div>
+        <div><label>Axe X — Niveau 2 (drill)</label><select id="cX2" onchange="resetDrills()"></select></div>
+        <div><label>Axe Y (montant)</label><select id="cY" onchange="resetDrills()"></select></div>
+        <div><label>Limite</label><select id="cLim" onchange="resetDrills()"><option value="10">Top 10</option><option value="20">Top 20</option><option value="50">Top 50</option></select></div>
+      </div>
+    </div>
+    <div class="bc" id="bc"></div>
+    <div class="drill-hint" id="dHint"></div>
+    <div class="ch-grid">
+      <div class="ch-card" id="cc-bar"><div class="ch-hd"><span class="ch-title">Barres verticales</span><button class="btn sm" id="bk-bar" onclick="drillUp()" style="display:none">↑ Remonter</button></div><canvas id="cBar"></canvas></div>
+      <div class="ch-card" id="cc-pie"><div class="ch-hd"><span class="ch-title">Donut</span><button class="btn sm" id="bk-pie" onclick="drillUp()" style="display:none">↑ Remonter</button></div><canvas id="cPie"></canvas></div>
+      <div class="ch-card" id="cc-line"><div class="ch-hd"><span class="ch-title">Lignes</span><button class="btn sm" id="bk-line" onclick="drillUp()" style="display:none">↑ Remonter</button></div><canvas id="cLine"></canvas></div>
+      <div class="ch-card" id="cc-hbar"><div class="ch-hd"><span class="ch-title">Barres horizontales</span><button class="btn sm" id="bk-hbar" onclick="drillUp()" style="display:none">↑ Remonter</button></div><canvas id="cHBar"></canvas></div>
+    </div>
+    <div id="drillPanel" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div id="drillTitle" style="font-size:13px;font-weight:600"></div>
+        <button class="btn sm" onclick="exportDrill()">⬇ CSV</button>
+      </div>
+      <div class="tbl-wrap"><div style="max-height:280px;overflow:auto"><table id="drillTable"></table></div>
+        <div class="pager"><span class="pager-info" id="dPagerInfo"></span><button class="btn sm" id="dPrev" onclick="dPage(-1)">←</button><button class="btn sm" id="dNext" onclick="dPage(1)">→</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-map">
+    <div class="card" style="padding:10px 14px">
+      <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+        <div><label>Colonne destination</label><select id="mapCol" style="width:260px"></select></div>
+        <button class="btn primary sm" onclick="reloadMap()">Actualiser</button>
+        <span id="geoStatus" style="font-size:12px;color:var(--tx3)"></span>
+      </div>
+      <div class="gbar"><div class="gfill" id="gFill" style="width:0%"></div></div>
+    </div>
+    <div id="mapEl"></div>
+    <div class="map-legend" id="mapLegend" style="display:none"></div>
+    <div id="mapTblWrap" style="display:none;margin-top:14px">
+      <div class="card-title" style="margin-bottom:8px">Détail par destination</div>
+      <div class="tbl-wrap"><div style="max-height:240px;overflow:auto"><table id="mapTable"></table></div></div>
+    </div>
+  </div>
+</div></div>
 
 <script>
-const MONTANT_COLS=['montant avance','total ij non dégrévés','frais prev saisies','total train','total avion','total location','total hébergement','total hebergement'];
-const NON_MONTANT=['no om','matricule','trajets train','trajets avion','locations voiture','nombre de nuit','no cde sifac','no rc sifac'];
+// ══════════════════════════════════════════════════════
+// LISTE BLANCHE DES COLONNES NUMÉRIQUES (noms Grist exacts)
+// Basée sur le diagnostic : Grist envoie les noms avec underscores
+// ══════════════════════════════════════════════════════
+const MONTANT_KEYS = new Set([
+  'Montant_avance',
+  'Total_IJ_non_degreves',
+  'Frais_prev_saisies',
+  'Total_train',
+  'Total_avion',
+  'Total_location',
+  'Total_hebergement',
+]);
 
-let H=[], R=[];
+// Colonnes numériques mais PAS des montants (ne pas afficher dans stats/TCD/graphiques)
+const EXCLU_KEYS = new Set([
+  'No_OM',
+  'Trajets_train',
+  'Trajets_avion',
+  'Locations_voiture',
+  'Nombre_de_nuit',
+]);
 
-function isNum(idx){
-  const h=(H[idx]||'').toLowerCase().trim();
-  if(NON_MONTANT.some(n=>h===n||h.includes(n)))return false;
-  if(MONTANT_COLS.some(n=>h===n||h.includes(n)))return true;
-  return false;
+function isNum(idx) {
+  return MONTANT_KEYS.has(H[idx]);
 }
 
+function isExclu(idx) {
+  return EXCLU_KEYS.has(H[idx]);
+}
+
+// Libellé lisible (remplace _ par espace)
+function lbl(key) {
+  return key.replace(/_/g, ' ');
+}
+
+// ── STATE ──
+let H=[], R=[], FR=[], SR=[];
+let tSortCol=-1, tSortDir=1, tCurPage=0;
+const PS=50;
+let pvR=[], pvC=[], pvV=[];
+let CO={bar:null,pie:null,line:null,hbar:null};
+let dLevel=0, dF1=null, dF2=null, dRows=[], dCurPage=0;
+let leafMap=null, mapReady=false, mapMk=[], geoCache={};
+const PAL=['#1B4FBF','#1A7A4A','#B85C00','#8B2AB5','#B52626','#0D7A8C','#6D4C1F','#1A5F7A','#7A5C00','#4A1FA0'];
+
+// ── GRIST ──
 function initGrist(){
-  if(typeof grist==='undefined'){
-    document.getElementById('gristStatus').innerHTML='<span style="color:orange">⚠ SDK Grist non trouvé — mode hors Grist</span>';
-    return;
-  }
-  document.getElementById('gristStatus').innerHTML='<span style="color:green">✓ SDK Grist chargé</span>';
+  if(typeof grist==='undefined'){setTimeout(loadDemo,400);return;}
   grist.ready({requiredAccess:'read table'});
   grist.onRecords(records=>{
-    if(!records||!records.length){
-      document.getElementById('gristStatus').innerHTML='<span style="color:red">✗ Aucun enregistrement reçu</span>';
-      return;
-    }
-    document.getElementById('gristStatus').innerHTML=`<span style="color:green">✓ ${records.length} enregistrements reçus</span>`;
+    if(!records||!records.length){showEmpty('Aucune donnée reçue de Grist.');return;}
     H=Object.keys(records[0]).filter(k=>k!=='id'&&!k.startsWith('_'));
     R=records.map(r=>H.map(h=>r[h]!==undefined&&r[h]!==null?r[h]:''));
-    renderDiag(records);
+    loaded();
   });
 }
 
-function renderDiag(records){
-  document.getElementById('colCount').textContent=H.length+' colonnes';
-
-  // Table colonnes
-  let rows='';
-  H.forEach((h,i)=>{
-    const v0=R.length>0?R[0][i]:'';
-    const v1=R.length>1?R[1][i]:'';
-    const t=typeof v0;
-    const num=isNum(i);
-    rows+=`<tr>
-      <td>${i}</td>
-      <td><b>${h}</b></td>
-      <td style="color:#999">${h.toLowerCase().trim()}</td>
-      <td><span class="badge ${t==='number'?'bn':'bt'}">${t}</span></td>
-      <td>${JSON.stringify(v0)}</td>
-      <td>${JSON.stringify(v1)}</td>
-      <td><span class="badge ${num?'bn':'bt'}">${num?'✓ OUI':'✗ non'}</span></td>
-    </tr>`;
-  });
-  document.getElementById('colBody').innerHTML=rows;
-
-  // JSON brut
-  document.getElementById('rawJson').textContent=JSON.stringify(records.slice(0,3),null,2);
-
-  // Test isNum
-  let html='<table><thead><tr><th>Nom colonne</th><th>toLowerCase()</th><th>Match MONTANT_COLS?</th><th>Match NON_MONTANT?</th><th>Résultat isNum</th></tr></thead><tbody>';
-  H.forEach((h,i)=>{
-    const lc=h.toLowerCase().trim();
-    const mMontant=MONTANT_COLS.find(n=>lc===n||lc.includes(n));
-    const mNon=NON_MONTANT.find(n=>lc===n||lc.includes(n));
-    const num=isNum(i);
-    html+=`<tr>
-      <td>${h}</td>
-      <td style="color:#999">${lc}</td>
-      <td>${mMontant?`<span class="badge bn">✓ "${mMontant}"</span>`:'—'}</td>
-      <td>${mNon?`<span class="badge bt">✓ "${mNon}"</span>`:'—'}</td>
-      <td><span class="badge ${num?'bn':'bt'}">${num?'MONTANT':'texte'}</span></td>
-    </tr>`;
-  });
-  html+='</tbody></table>';
-  document.getElementById('numTest').innerHTML=html;
+function loadDemo(){
+  // Noms de colonnes identiques à Grist (avec underscores)
+  H=['No_OM','Dte_Creation','Saisie_de_l_OM_par','Nom_du_voyageur','Matricule',
+     'Pris_en_charge_pole_voyage','Type_OM','Type_resa','Statut_OM','Demande_avance',
+     'Statut_avance','Montant_avance','Date_validation_OM','Objet_OM','Date_depart',
+     'Date_fin','Depart_realise','Retour_realise','Total_IJ_non_degreves','Frais_prev_saisies',
+     'No_cde_SIFAC','No_rc_SIFAC','Destinantion_OD','Orga','Centre_de_cout','EOTP',
+     'Trajets_train','Total_train','Trajets_avion','Total_avion','Locations_voiture',
+     'Total_location','Nombre_de_nuit','Total_hebergement','Remarque'];
+  const st=['Temps validés','Clôturé validé','Validé','Annulé','Archivé validé'];
+  const tp=['STANDARD','SANS FRAIS'];
+  const ds=['Paris, FRANCE','Lyon, FRANCE','Montpellier, FRANCE','Bordeaux, FRANCE','Toulouse, FRANCE','Rennes, FRANCE','Berlin, ALLEMAGNE','Madrid, ESPAGNE'];
+  const og=['UNI-0496 MTS','UNI-0050 LBE','UNI-1334 AGAP','UNI-1114 EMMAH','UNI-0459 BAP'];
+  R=Array.from({length:300},(_,i)=>[
+    18177+i,                           // No_OM
+    '2025-03-'+String(1+i%28).padStart(2,'0')+'T00:00:00.000Z', // Dte_Creation
+    'NANO Stephane',                   // Saisie
+    ['ADEL Karine','AWAD Yara','MARTIN Pierre','DUPONT Marie'][i%4],
+    '000501'+String(4860+i).padStart(4,'0'), // Matricule
+    'Non','STANDARD',                  // Pris en charge, Type OM
+    ['ONLINE','','OFFLINE'][i%3],      // Type_resa
+    st[i%5],                           // Statut_OM
+    ['NON','OUI'][i%3===0?1:0],        // Demande_avance
+    ['','Validé'][i%4===0?1:0],        // Statut_avance
+    i%6===0?0:Math.round(Math.random()*600),  // Montant_avance
+    '2025-03-'+String(1+i%28).padStart(2,'0')+'T10:00:00.000Z', // Date_validation
+    'Mission objet '+i,                // Objet_OM
+    '2025-04-'+String(1+i%28).padStart(2,'0')+'T08:00:00.000Z', // Date_depart
+    '2025-04-'+String(1+i%28).padStart(2,'0')+'T18:00:00.000Z', // Date_fin
+    '','',                             // Depart/Retour réalisé
+    i%3===0?0:Math.round(Math.random()*80),   // Total_IJ
+    Math.round(Math.random()*150),     // Frais_prev
+    i%4===0?'':('SIFAC_45000'+String(30000+i)),
+    i%5===0?'':('SIFAC_32000'+String(10000+i)),
+    ds[i%ds.length],                   // Destinantion_OD
+    og[i%og.length],                   // Orga
+    'CC-'+String(1000+i%20),           // Centre_de_cout
+    '',                                // EOTP
+    Math.floor(Math.random()*2),       // Trajets_train
+    i%3===0?0:Math.round(Math.random()*450),  // Total_train
+    Math.floor(Math.random()*2),       // Trajets_avion
+    i%5===0?0:Math.round(Math.random()*950),  // Total_avion
+    0,0,                               // Locations_voiture, Total_location
+    Math.floor(Math.random()*4),       // Nombre_de_nuit
+    i%4===0?0:Math.round(Math.random()*300),  // Total_hebergement
+    ''                                 // Remarque
+  ]);
+  loaded();
 }
 
+function loaded(){
+  document.getElementById('loadingEl').style.display='none';
+  FR=[...R];SR=[...R];tSortCol=-1;tSortDir=1;tCurPage=0;
+  document.getElementById('topBadge').textContent=R.length.toLocaleString('fr-FR')+' enregistrements';
+  document.getElementById('lastUpdate').textContent='Mis à jour '+new Date().toLocaleTimeString('fr-FR');
+  buildOverview();
+  buildTableControls();renderTable();
+  buildPivotUI();
+  buildChartControls();
+  buildMapControls();
+  go('overview');
+}
+
+function showEmpty(m){document.getElementById('loadingEl').innerHTML=`<div class="empty">${m}</div>`;}
+function go(t){
+  document.querySelectorAll('.tab,.panel').forEach(e=>e.classList.remove('active'));
+  const tb=document.querySelector(`.tab[onclick*="'${t}'"]`);if(tb)tb.classList.add('active');
+  const pn=document.getElementById('panel-'+t);if(pn)pn.classList.add('active');
+}
+
+// ── OVERVIEW ──
+function fmtDate(v){
+  if(!v||typeof v!=='string')return v;
+  if(v.includes('T')){try{return new Date(v).toLocaleDateString('fr-FR');}catch(e){}}
+  return v;
+}
+
+function buildOverview(){
+  const stats=[
+    {label:'Enregistrements',val:R.length.toLocaleString('fr-FR'),sub:'total lignes'},
+    {label:'Colonnes',val:H.length,sub:'champs disponibles'},
+  ];
+  // Une stat par colonne montant
+  H.forEach((h,i)=>{
+    if(!isNum(i))return;
+    const sum=R.reduce((s,r)=>{const v=r[i];return s+(typeof v==='number'?v:(parseFloat(v)||0));},0);
+    stats.push({label:lbl(h),val:Math.round(sum).toLocaleString('fr-FR')+' €',sub:'total cumulé'});
+  });
+  document.getElementById('statsGrid').innerHTML=stats.map(s=>`
+    <div class="stat-card">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-val">${s.val}</div>
+      <div class="stat-sub">${s.sub}</div>
+    </div>`).join('');
+  // Aperçu table (format dates)
+  let h='<thead><tr>'+H.map(c=>`<th>${lbl(c)}</th>`).join('')+'</tr></thead><tbody>';
+  R.slice(0,20).forEach(r=>{
+    h+='<tr>'+r.map((v,i)=>{
+      const disp=H[i].includes('date')||H[i].includes('Date')||H[i].includes('Creation')||H[i].includes('realise')?fmtDate(String(v)):v;
+      return `<td title="${String(v).replace(/"/g,'')}">${disp}</td>`;
+    }).join('')+'</tr>';
+  });
+  document.getElementById('ovTable').innerHTML=h+'</tbody>';
+}
+
+// ── TABLE ──
+function buildTableControls(){
+  document.getElementById('tColF').innerHTML='<option value="">— toutes —</option>'+H.map((h,i)=>`<option value="${i}">${lbl(h)}</option>`).join('');
+}
+function applySort(){
+  SR=[...FR];
+  if(tSortCol>=0)SR.sort((a,b)=>{
+    const av=a[tSortCol],bv=b[tSortCol];
+    if(typeof av==='number'&&typeof bv==='number')return(av-bv)*tSortDir;
+    const an=parseFloat(av),bn=parseFloat(bv);
+    if(!isNaN(an)&&!isNaN(bn))return(an-bn)*tSortDir;
+    return String(av).localeCompare(String(bv))*tSortDir;
+  });
+}
+function doFilter(){
+  const q=document.getElementById('tSearch').value.toLowerCase();
+  const ci=document.getElementById('tColF').value;
+  const cv=document.getElementById('tValF').value.toLowerCase();
+  FR=R.filter(r=>{
+    if(q&&!r.some(v=>String(v).toLowerCase().includes(q)))return false;
+    if(ci!==''&&cv&&!String(r[+ci]).toLowerCase().includes(cv))return false;
+    return true;
+  });
+  tCurPage=0;applySort();renderTable();
+}
+function renderTable(){
+  const s=tCurPage*PS,e=Math.min(s+PS,SR.length);
+  let h='<thead><tr>'+H.map((c,i)=>`<th class="${tSortCol===i?(tSortDir>0?'sa':'sd'):''}" onclick="sortCol(${i})">${lbl(c)}</th>`).join('')+'</tr></thead><tbody>';
+  SR.slice(s,e).forEach(r=>{h+='<tr>'+r.map(v=>`<td title="${String(v).replace(/"/g,'')}">${v}</td>`).join('')+'</tr>';});
+  h+='</tbody>';
+  document.getElementById('mainTable').innerHTML=h;
+  const t=Math.ceil(SR.length/PS);
+  document.getElementById('tPagerInfo').textContent='Lignes '+(s+1).toLocaleString('fr-FR')+'–'+e.toLocaleString('fr-FR')+' sur '+SR.length.toLocaleString('fr-FR')+' · Page '+(tCurPage+1)+'/'+t;
+  document.getElementById('tPrev').disabled=tCurPage===0;
+  document.getElementById('tNext').disabled=tCurPage>=t-1;
+  document.getElementById('tCount').textContent=SR.length.toLocaleString('fr-FR')+' / '+R.length.toLocaleString('fr-FR')+' lignes';
+}
+function sortCol(i){if(tSortCol===i)tSortDir*=-1;else{tSortCol=i;tSortDir=1;}tCurPage=0;applySort();renderTable();}
+function tPage(d){tCurPage=Math.max(0,Math.min(tCurPage+d,Math.ceil(SR.length/PS)-1));renderTable();}
+
+// ── TCD ──
+function numIdxs(){return H.map((_,i)=>i).filter(i=>isNum(i));}
+function textIdxs(){return H.map((_,i)=>i).filter(i=>!isNum(i)&&!isExclu(i)&&typeof(R[0]&&R[0][i])!=='object');}
+
+function buildPivotUI(){
+  // Liste des champs disponibles
+  document.getElementById('fieldList').innerHTML=H.map((h,i)=>`
+    <div class="fi${isNum(i)?' num':''}" title="${isNum(i)?'Montant (numérique)':'Texte / catégorie'}">
+      ${lbl(h)}
+    </div>`).join('');
+
+  // Options select Lignes/Colonnes : tous les champs non-montant
+  const allOpts='<option value="">+ Ajouter un champ</option>'+
+    H.map((h,i)=>!isNum(i)?`<option value="${i}">${lbl(h)}</option>`:'').join('');
+
+  // Options select Valeurs : uniquement les montants + comptage
+  const nIdxs=numIdxs();
+  const numOpts='<option value="">+ Ajouter une valeur</option>'+
+    nIdxs.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('')+
+    '<option value="_count">Comptage (nb de lignes)</option>';
+
+  document.getElementById('selR').innerHTML=allOpts;
+  document.getElementById('selC').innerHTML=allOpts;
+  document.getElementById('selV').innerHTML=numOpts;
+
+  // Pré-remplissage : Statut_OM en ligne, Total_hebergement en valeur
+  pvR=[];pvC=[];pvV=[];
+  const si=H.indexOf('Statut_OM');
+  const hi=H.indexOf('Total_hebergement');
+  const ti=H.indexOf('Total_train');
+  if(si>=0) pvR.push({idx:String(si),label:lbl(H[si])});
+  const valIdx=hi>=0?hi:(ti>=0?ti:(nIdxs.length>0?nIdxs[0]:-1));
+  if(valIdx>=0) pvV.push({idx:String(valIdx),label:lbl(H[valIdx])});
+  else pvV.push({idx:'_count',label:'Comptage'});
+
+  ['r','c','v'].forEach(z=>renderChips(z));
+  buildPivot();
+}
+
+function addZone(z){
+  const ids={r:'selR',c:'selC',v:'selV'};
+  const sel=document.getElementById(ids[z]);
+  const val=sel.value;if(!val)return;
+  const label=val==='_count'?'Comptage':lbl(H[+val]);
+  const arr={r:pvR,c:pvC,v:pvV}[z];
+  if(arr.find(x=>x.idx===val))return;
+  arr.push({idx:val,label});
+  sel.value='';renderChips(z);buildPivot();
+}
+function rmZone(z,idx){
+  const arr={r:pvR,c:pvC,v:pvV}[z];
+  const p=arr.findIndex(x=>x.idx===idx);if(p>=0)arr.splice(p,1);
+  renderChips(z);buildPivot();
+}
+function renderChips(z){
+  const arr={r:pvR,c:pvC,v:pvV}[z];
+  const el=document.getElementById({r:'zRows',c:'zCols',v:'zVals'}[z]);
+  el.innerHTML=arr.map(x=>`<span class="chip${z==='v'?' num':''}">${x.label}<span class="x" onclick="rmZone('${z}','${x.idx}')">×</span></span>`).join('');
+}
+function resetPivot(){pvR=[];pvC=[];pvV=[];['r','c','v'].forEach(z=>renderChips(z));document.getElementById('pvResult').innerHTML='';}
+
+function getVal(r,idx){
+  const v=r[+idx];
+  if(typeof v==='number')return v;
+  return parseFloat(String(v).replace(/\s/g,'').replace(',','.'))||0;
+}
+
+function aggF(vals,m){
+  if(m==='count')return vals.length;
+  const nums=vals.map(v=>typeof v==='number'?v:(parseFloat(String(v).replace(/\s/g,'').replace(',','.'))||0));
+  if(!nums.length)return 0;
+  if(m==='sum')return nums.reduce((a,b)=>a+b,0);
+  if(m==='avg')return nums.reduce((a,b)=>a+b,0)/nums.length;
+  if(m==='min')return Math.min(...nums);
+  if(m==='max')return Math.max(...nums);
+  return 0;
+}
+function fmtN(v,m){const n=Number(v);return isNaN(n)?v:m==='avg'?n.toFixed(1):Math.round(n).toLocaleString('fr-FR');}
+
+function buildPivot(){
+  const agg=document.getElementById('pvAgg').value;
+  const heat=document.getElementById('pvHeat').value;
+  const res=document.getElementById('pvResult');
+  if(!pvR.length&&!pvC.length){res.innerHTML='<div class="empty">Ajoutez au moins un champ en <b>Lignes</b> ou en <b>Colonnes</b>.</div>';return;}
+  if(!pvV.length){res.innerHTML='<div class="empty">Ajoutez au moins une <b>Valeur</b> à calculer.</div>';return;}
+
+  const rFields=pvR.map(x=>+x.idx);
+  const cFields=pvC.map(x=>+x.idx);
+  const vField=pvV[0].idx;
+
+  const map={},rKs=new Set(),cKs=new Set();
+  R.forEach(r=>{
+    const rk=rFields.length?rFields.map(i=>String(r[i]??'')).join(' | '):'(tout)';
+    const ck=cFields.length?cFields.map(i=>String(r[i]??'')).join(' | '):'';
+    rKs.add(rk);cKs.add(ck);
+    if(!map[rk])map[rk]={};
+    if(!map[rk][ck])map[rk][ck]=[];
+    map[rk][ck].push(vField==='_count'?1:getVal(r,vField));
+  });
+
+  let rArr=[...rKs],cArr=cFields.length?[...cKs]:[''];
+  const rTot={},cTot={};
+  rArr.forEach(rk=>{rTot[rk]=aggF(cArr.flatMap(ck=>map[rk]?.[ck]||[]),agg);});
+  cArr.forEach(ck=>{cTot[ck]=aggF(rArr.flatMap(rk=>map[rk]?.[ck]||[]),agg);});
+  rArr.sort((a,b)=>rTot[b]-rTot[a]);
+
+  const allVals=rArr.flatMap(rk=>cArr.map(ck=>map[rk]?.[ck]?aggF(map[rk][ck],agg):0));
+  const gMax=Math.max(...allVals,1);
+  const maxR=Math.min(rArr.length,50),maxC=Math.min(cArr.length,20);
+  const dR=rArr.slice(0,maxR),dC=cArr.slice(0,maxC);
+
+  const rhLabel=rFields.map(i=>lbl(H[i])).join(' + ')||' ';
+  let html=`<div class="pv-table-wrap"><table class="pvt"><thead><tr><th class="rh">${rhLabel}</th>`;
+  if(cFields.length){dC.forEach((ck,ci)=>{html+=`<th onclick="pvSort(${ci})" title="${ck}">${ck.length>16?ck.slice(0,16)+'…':ck}</th>`;});}
+  html+=`<th class="tc">Total</th></tr></thead><tbody>`;
+
+  dR.forEach(rk=>{
+    const rowMax=Math.max(...dC.map(ck=>map[rk]?.[ck]?aggF(map[rk][ck],agg):0),1);
+    html+=`<tr><td class="rl">${rk.length>32?`<span title="${rk}">${rk.slice(0,32)}…</span>`:rk}</td>`;
+    if(cFields.length){
+      dC.forEach(ck=>{
+        const v=map[rk]?.[ck]?aggF(map[rk][ck],agg):0;
+        const cMax=Math.max(...dR.map(r2=>map[r2]?.[ck]?aggF(map[r2][ck],agg):0),1);
+        const pct=heat==='none'?0:heat==='row'?(v/rowMax*100):heat==='col'?(v/cMax*100):(v/gMax*100);
+        html+=`<td><div class="hbar" style="width:${pct.toFixed(1)}%;background:var(--bl)"></div><span class="cv">${fmtN(v,agg)}</span></td>`;
+      });
+    }
+    const pct2=heat==='none'?0:(rTot[rk]/Math.max(...dR.map(r2=>rTot[r2]),1)*100);
+    html+=`<td class="tc"><div class="hbar" style="width:${pct2.toFixed(1)}%;background:var(--bl)"></div><span class="cv">${fmtN(rTot[rk],agg)}</span></td></tr>`;
+  });
+
+  html+=`<tr class="tr-total"><td class="rl">Total</td>`;
+  if(cFields.length){dC.forEach(ck=>{html+=`<td><span class="cv">${fmtN(cTot[ck]||0,agg)}</span></td>`;});}
+  const grandTotal=aggF(rArr.flatMap(rk=>cArr.flatMap(ck=>map[rk]?.[ck]||[])),agg);
+  html+=`<td class="tc"><span class="cv">${fmtN(grandTotal,agg)}</span></td></tr></tbody></table></div>`;
+  if(rArr.length>maxR)html+=`<p style="font-size:11px;color:var(--tx3);margin-top:5px">${rArr.length-maxR} lignes supplémentaires non affichées.</p>`;
+  res.innerHTML=html;
+}
+
+// ── GRAPHIQUES ──
+function buildChartControls(){
+  const tI=textIdxs(),nI=numIdxs();
+  const aOpts=H.map((h,i)=>!isNum(i)?`<option value="${i}">${lbl(h)}</option>`:'').join('');
+  const nOpts=nI.map(i=>`<option value="${i}">${lbl(H[i])}</option>`).join('');
+  ['cX','cX2'].forEach(id=>document.getElementById(id).innerHTML=aOpts);
+  document.getElementById('cY').innerHTML=nOpts;
+  // Defaults : Statut_OM / Type_OM / Total_hebergement
+  const si=H.indexOf('Statut_OM');
+  const ti=H.indexOf('Type_OM');
+  const hi=H.indexOf('Total_hebergement');
+  const tri=H.indexOf('Total_train');
+  if(si>=0)document.getElementById('cX').value=si;
+  else if(tI.length>0)document.getElementById('cX').value=tI[0];
+  if(ti>=0)document.getElementById('cX2').value=ti;
+  else if(tI.length>1)document.getElementById('cX2').value=tI[1];
+  const yDefault=hi>=0?hi:(tri>=0?tri:(nI.length>0?nI[0]:-1));
+  if(yDefault>=0)document.getElementById('cY').value=yDefault;
+  resetDrills();
+}
+
+function gCtrl(){return{xI:+document.getElementById('cX').value,x2I:+document.getElementById('cX2').value,yI:+document.getElementById('cY').value,lim:+document.getElementById('cLim').value};}
+
+function aggBy(rows,gI,vI,lim){
+  const m={};
+  rows.forEach(r=>{
+    const k=String(r[gI]??'(vide)');
+    if(!m[k])m[k]=0;
+    const v=r[vI];
+    m[k]+=(typeof v==='number'?v:(parseFloat(v)||0));
+  });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,lim);
+}
+
+function buildCharts(rows,level){
+  const{xI,x2I,yI,lim}=gCtrl();
+  const gI=level===0?xI:x2I;
+  const entries=aggBy(rows,gI,yI,lim);
+  const labels=entries.map(e=>e[0]),vals=entries.map(e=>Math.round(e[1]));
+  const bg=labels.map((_,i)=>PAL[i%PAL.length]);
+  const yL=lbl(H[yI]||'Valeur');
+
+  function oc(ls,rs,lv){return(_,els)=>{if(!els.length)return;drillClick(ls[els[0].index],lv,rs);};}
+  const base={responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${Number(c.parsed.y!==undefined?c.parsed.y:c.parsed).toLocaleString('fr-FR')}`}}},
+    scales:{x:{ticks:{maxRotation:40,font:{size:10},maxTicksLimit:15}},y:{ticks:{font:{size:10},callback:v=>Number(v).toLocaleString('fr-FR')}}}};
+  const circ={responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{display:true,position:'right',labels:{font:{size:10},padding:8}},
+    tooltip:{callbacks:{label:c=>`${c.label}: ${Number(c.parsed).toLocaleString('fr-FR')}`}}}};
+
+  ['bar','pie','line','hbar'].forEach(id=>{if(CO[id]){CO[id].destroy();CO[id]=null;}});
+  CO.bar=new Chart(document.getElementById('cBar').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:yL,data:vals,backgroundColor:bg,borderWidth:0,borderRadius:3}]},options:{...base,onClick:oc(labels,rows,level)}});
+  CO.pie=new Chart(document.getElementById('cPie').getContext('2d'),{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:bg,borderWidth:0}]},options:{...circ,onClick:oc(labels,rows,level)}});
+  CO.line=new Chart(document.getElementById('cLine').getContext('2d'),{type:'line',data:{labels,datasets:[{label:yL,data:vals,borderColor:PAL[0],backgroundColor:PAL[0]+'22',borderWidth:2,pointRadius:3,fill:true,tension:.3}]},options:{...base,onClick:oc(labels,rows,level)}});
+  CO.hbar=new Chart(document.getElementById('cHBar').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:yL,data:vals,backgroundColor:bg,borderWidth:0,borderRadius:3}]},options:{...base,indexAxis:'y',onClick:oc(labels,rows,level),scales:{x:{ticks:{font:{size:10},callback:v=>Number(v).toLocaleString('fr-FR')}},y:{ticks:{font:{size:10},maxTicksLimit:15}}}}});
+
+  ['bar','pie','line','hbar'].forEach(id=>{
+    document.getElementById('bk-'+id).style.display=dLevel>0?'':'none';
+    document.getElementById('cc-'+id).classList.toggle('drilled',dLevel>0);
+  });
+  document.getElementById('dHint').textContent=level===0
+    ?`Cliquez → détail par « ${lbl(H[gCtrl().x2I])} »`
+    :`Cliquez → voir les lignes correspondantes`;
+  updateBC();
+}
+
+function resetDrills(){dLevel=0;dF1=null;dF2=null;dRows=[];dCurPage=0;document.getElementById('drillPanel').style.display='none';buildCharts(R,0);updateBC();}
+function drillUp(){
+  if(dLevel===2){dLevel=1;dF2=null;dCurPage=0;document.getElementById('drillPanel').style.display='none';const{xI}=gCtrl();buildCharts(R.filter(r=>String(r[xI]??'')==dF1),1);}
+  else if(dLevel===1){resetDrills();}
+  updateBC();
+}
+function drillClick(clicked,level,rows){
+  const{xI,x2I}=gCtrl();
+  if(level===0){dLevel=1;dF1=clicked;buildCharts(rows.filter(r=>String(r[xI]??'')==clicked),1);document.getElementById('drillPanel').style.display='none';}
+  else{dLevel=2;dF2=clicked;dRows=rows.filter(r=>String(r[x2I]??'')==clicked);dCurPage=0;showDrillTbl();}
+  updateBC();
+}
+function showDrillTbl(){
+  const{xI,x2I}=gCtrl();
+  document.getElementById('drillPanel').style.display='';
+  document.getElementById('drillTitle').textContent=`${lbl(H[xI])} = « ${dF1} »  ·  ${lbl(H[x2I])} = « ${dF2} »  —  ${dRows.length.toLocaleString('fr-FR')} lignes`;
+  renderDrillTbl();
+}
+function renderDrillTbl(){
+  const s=dCurPage*PS,e=Math.min(s+PS,dRows.length);
+  let h='<thead><tr>'+H.map(c=>`<th>${lbl(c)}</th>`).join('')+'</tr></thead><tbody>';
+  dRows.slice(s,e).forEach(r=>{h+='<tr>'+r.map(v=>`<td>${v}</td>`).join('')+'</tr>';});
+  h+='</tbody>';
+  document.getElementById('drillTable').innerHTML=h;
+  const t=Math.ceil(dRows.length/PS);
+  document.getElementById('dPagerInfo').textContent=(s+1)+'–'+e+' / '+dRows.length+' · p.'+(dCurPage+1)+'/'+t;
+  document.getElementById('dPrev').disabled=dCurPage===0;
+  document.getElementById('dNext').disabled=dCurPage>=t-1;
+}
+function dPage(d){dCurPage=Math.max(0,Math.min(dCurPage+d,Math.ceil(dRows.length/PS)-1));renderDrillTbl();}
+function exportDrill(){
+  const rows=[H,...dRows];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='drill.csv';a.click();
+}
+function updateBC(){
+  const{xI,x2I}=gCtrl();if(!H.length)return;
+  const bc=document.getElementById('bc');
+  let p=[`<a class="${dLevel===0?'cur':''}" onclick="resetDrills()">Vue d'ensemble</a>`];
+  if(dF1)p.push(`<span class="bc-sep">›</span><a class="${dLevel===1?'cur':''}" onclick="drillUp()">${lbl(H[xI])} = « ${dF1} »</a>`);
+  if(dF2)p.push(`<span class="bc-sep">›</span><a class="cur">${lbl(H[x2I])} = « ${dF2} »</a>`);
+  bc.innerHTML=p.join('');
+}
+
+// ── CARTE ──
+function buildMapControls(){
+  const sel=document.getElementById('mapCol');
+  sel.innerHTML=H.map((h,i)=>`<option value="${i}">${lbl(h)}</option>`).join('');
+  const ai=H.findIndex(h=>h.toLowerCase().includes('destin'));
+  if(ai>=0)sel.value=ai;
+}
+function initMap(){
+  if(mapReady)return;mapReady=true;
+  leafMap=L.map('mapEl',{center:[20,10],zoom:2});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(leafMap);
+  if(R.length>0)reloadMap();
+}
+async function geocode(place){
+  const k=place.toLowerCase().trim();
+  if(geoCache[k])return geoCache[k];
+  try{
+    const parts=place.split(',');
+    const city=parts[0].trim(),country=parts.length>1?parts[parts.length-1].trim():'';
+    const q=country?`${city}, ${country}`:city;
+    const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,{headers:{'Accept-Language':'fr','User-Agent':'GristOMWidget/1.0'}});
+    const d=await res.json();
+    if(d&&d.length){const r={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};geoCache[k]=r;return r;}
+  }catch(e){}return null;
+}
+async function reloadMap(){
+  if(!leafMap){initMap();return;}
+  const ci=+document.getElementById('mapCol').value;
+  const cnt={};R.forEach(r=>{const v=String(r[ci]||'').trim();if(v)cnt[v]=(cnt[v]||0)+1;});
+  const dests=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  mapMk.forEach(m=>leafMap.removeLayer(m));mapMk=[];
+  const maxC=Math.max(...dests.map(d=>d[1]),1);
+  let done=0;const results=[];
+  document.getElementById('geoStatus').textContent=`Géocodage de ${dests.length} destinations…`;
+  for(const [place,count] of dests){
+    const geo=await geocode(place);done++;
+    document.getElementById('gFill').style.width=Math.round(done/dests.length*100)+'%';
+    document.getElementById('geoStatus').textContent=`${done}/${dests.length} — ${place}`;
+    if(geo)results.push({place,count,lat:geo.lat,lng:geo.lng});
+    if(done%5===0)await new Promise(r=>setTimeout(r,150));
+  }
+  results.forEach(({place,count,lat,lng})=>{
+    const radius=8+Math.sqrt(count/maxC)*38;
+    const m=L.circleMarker([lat,lng],{radius,fillColor:'#1B4FBF',color:'#fff',weight:1.5,fillOpacity:.65});
+    m.bindPopup(`<b>${place}</b><br>${count.toLocaleString('fr-FR')} mission${count>1?'s':''}`);
+    m.addTo(leafMap);mapMk.push(m);
+  });
+  if(results.length)leafMap.fitBounds(L.latLngBounds(results.map(r=>[r.lat,r.lng])),{padding:[30,30]});
+  document.getElementById('geoStatus').textContent=`✓ ${results.length} destinations géocodées`;
+  const maxV=Math.max(...results.map(r=>r.count),1);
+  const steps=[1,Math.round(maxV*.25),Math.round(maxV*.5),maxV].filter((v,i,a)=>a.indexOf(v)===i&&v>0);
+  document.getElementById('mapLegend').innerHTML='<b style="font-size:12px">Légende</b> '+
+    steps.map(s=>{const r=8+Math.sqrt(s/maxV)*38;return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><span style="width:${r}px;height:${r}px;border-radius:50%;background:#1B4FBF;opacity:.7;display:inline-block;flex-shrink:0"></span>${s.toLocaleString('fr-FR')} mission${s>1?'s':''}</span>`;}).join('');
+  document.getElementById('mapLegend').style.display='flex';
+  let th='<thead><tr><th>#</th><th>Destination</th><th>Missions</th><th>%</th></tr></thead><tbody>';
+  const tot=dests.reduce((s,[,c])=>s+c,0);
+  results.slice(0,50).forEach(({place,count},i)=>{th+=`<tr><td>${i+1}</td><td>${place}</td><td>${count.toLocaleString('fr-FR')}</td><td>${(count/tot*100).toFixed(1)}%</td></tr>`;});
+  document.getElementById('mapTable').innerHTML=th+'</tbody>';
+  document.getElementById('mapTblWrap').style.display='';
+}
+
+// ── INIT ──
 const sdk=document.createElement('script');
 sdk.src='https://docs.getgrist.com/grist-plugin-api.js';
 sdk.onload=()=>initGrist();
-sdk.onerror=()=>{document.getElementById('gristStatus').innerHTML='<span style="color:red">✗ SDK Grist non chargeable</span>';};
+sdk.onerror=()=>loadDemo();
 document.head.appendChild(sdk);
 </script>
 </body></html>
