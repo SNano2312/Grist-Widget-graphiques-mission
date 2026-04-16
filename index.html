@@ -293,7 +293,7 @@ canvas{max-height:250px;cursor:pointer}
 // ═══════════════════════════════════════════════
 // ÉTAT GLOBAL
 // ═══════════════════════════════════════════════
-let allRows=[], allHeaders=[], filteredRows=[];
+let allRows=[], allHeaders=[], filteredRows=[], sortedRows=[];
 let tblPage=0, tblSortCol=-1, tblSortDir=1;
 const TBL_PAGE=50;
 
@@ -349,11 +349,14 @@ function loadDemoData(){
 function onDataLoaded(){
   document.getElementById('loadingEl').style.display='none';
   filteredRows=[...allRows];
+  sortedRows=[...allRows];
+  tblSortCol=-1;tblSortDir=1;
   const n=allRows.length;
   document.getElementById('topBadge').textContent=n.toLocaleString('fr-FR')+' enregistrements';
   document.getElementById('lastUpdate').textContent='Mis à jour '+new Date().toLocaleTimeString('fr-FR');
   buildOverview();
   buildTableControls();
+  renderTable();
   buildPivotFields();
   buildChartControls();
   buildMapControls();
@@ -385,13 +388,13 @@ function buildOverview(){
     {label:'Total enregistrements',val:allRows.length.toLocaleString('fr-FR'),sub:'lignes dans la table'},
     {label:'Colonnes',val:allHeaders.length,sub:'champs disponibles'},
   ];
-  // Trouver colonnes montant et sommer
-  ['Total train','Total avion','Total hébergement','Montant avance'].forEach(name=>{
-    const idx=allHeaders.findIndex(h=>h.toLowerCase().includes(name.toLowerCase().split(' ')[1]||name.toLowerCase()));
-    if(idx>=0){
-      const sum=allRows.reduce((s,r)=>s+(parseFloat(r[idx])||0),0);
-      if(sum>0)stats.push({label:'Σ '+allHeaders[idx],val:Math.round(sum).toLocaleString('fr-FR')+' €',sub:'total cumulé'});
-    }
+  // Stats dynamiques sur toutes les colonnes numériques trouvées
+  const seenStatCols=new Set();
+  allHeaders.forEach((h,i)=>{
+    if(!isNumericCol(i))return;
+    if(seenStatCols.has(i))return;
+    const sum=allRows.reduce((s,r)=>s+(parseFloat(r[i])||0),0);
+    if(sum>0){seenStatCols.add(i);stats.push({label:h,val:Math.round(sum).toLocaleString('fr-FR')+' €',sub:'total cumulé'});}
   });
   document.getElementById('statsGrid').innerHTML=stats.map(s=>`
     <div class="stat-card">
@@ -414,6 +417,18 @@ function buildTableControls(){
   sel.innerHTML='<option value="">— Filtrer par colonne —</option>'+allHeaders.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
 }
 
+function applySort(){
+  sortedRows=[...filteredRows];
+  if(tblSortCol>=0){
+    sortedRows.sort((a,b)=>{
+      const av=a[tblSortCol],bv=b[tblSortCol];
+      const an=parseFloat(av),bn=parseFloat(bv);
+      if(!isNaN(an)&&!isNaN(bn))return(an-bn)*tblSortDir;
+      return String(av).localeCompare(String(bv))*tblSortDir;
+    });
+  }
+}
+
 function filterTable(){
   const q=document.getElementById('tableSearch').value.toLowerCase();
   const colI=document.getElementById('tableColFilter').value;
@@ -423,26 +438,24 @@ function filterTable(){
     if(colI!==''&&val&&!String(r[+colI]).toLowerCase().includes(val))return false;
     return true;
   });
-  tblPage=0;renderTable();
+  tblPage=0;applySort();renderTable();
 }
 
 function renderTable(){
-  const s=tblPage*TBL_PAGE,e=Math.min(s+TBL_PAGE,filteredRows.length);
-  let sorted=[...filteredRows];
-  if(tblSortCol>=0)sorted.sort((a,b)=>{const av=a[tblSortCol],bv=b[tblSortCol];const an=parseFloat(av),bn=parseFloat(bv);if(!isNaN(an)&&!isNaN(bn))return(an-bn)*tblSortDir;return String(av).localeCompare(String(bv))*tblSortDir;});
+  const s=tblPage*TBL_PAGE,e=Math.min(s+TBL_PAGE,sortedRows.length);
   let h='<thead><tr>'+allHeaders.map((c,i)=>`<th class="${tblSortCol===i?(tblSortDir>0?'sort-asc':'sort-desc'):''}" onclick="sortTable(${i})">${c}</th>`).join('')+'</tr></thead><tbody>';
-  sorted.slice(s,e).forEach(r=>{h+='<tr>'+r.map(v=>`<td title="${String(v).replace(/"/g,'')}">${v}</td>`).join('')+'</tr>';});
+  sortedRows.slice(s,e).forEach(r=>{h+='<tr>'+r.map(v=>`<td title="${String(v).replace(/"/g,'')}">${v}</td>`).join('')+'</tr>';});
   h+='</tbody>';
   document.getElementById('mainTable').innerHTML=h;
-  const t=Math.ceil(filteredRows.length/TBL_PAGE);
-  document.getElementById('tblPagerInfo').textContent='Lignes '+(s+1).toLocaleString('fr-FR')+'–'+e.toLocaleString('fr-FR')+' sur '+filteredRows.length.toLocaleString('fr-FR')+' · Page '+(tblPage+1)+'/'+t;
-  document.getElementById('tblPrev').disabled=tblPage===0;
-  document.getElementById('tblNext').disabled=tblPage>=t-1;
-  document.getElementById('tableCount').textContent=filteredRows.length.toLocaleString('fr-FR')+' / '+allRows.length.toLocaleString('fr-FR')+' lignes';
+  const t=Math.ceil(sortedRows.length/TBL_PAGE);
+  document.getElementById('tblPagerInfo').textContent='Lignes '+(s+1).toLocaleString('fr-FR')+'–'+e.toLocaleString('fr-FR')+' sur '+sortedRows.length.toLocaleString('fr-FR')+' · Page '+(tblPage+1)+'/'+t;
+  document.getElementById('btnPrev').disabled=tblPage===0;
+  document.getElementById('btnNext').disabled=tblPage>=t-1;
+  document.getElementById('tableCount').textContent=sortedRows.length.toLocaleString('fr-FR')+' / '+allRows.length.toLocaleString('fr-FR')+' lignes';
 }
 
-function sortTable(i){if(tblSortCol===i)tblSortDir*=-1;else{tblSortCol=i;tblSortDir=1;}tblPage=0;renderTable();}
-function changeTblPage(d){tblPage=Math.max(0,Math.min(tblPage+d,Math.ceil(filteredRows.length/TBL_PAGE)-1));renderTable();}
+function sortTable(i){if(tblSortCol===i)tblSortDir*=-1;else{tblSortCol=i;tblSortDir=1;}tblPage=0;applySort();renderTable();}
+function changeTblPage(d){tblPage=Math.max(0,Math.min(tblPage+d,Math.ceil(sortedRows.length/TBL_PAGE)-1));renderTable();}
 
 // ═══════════════════════════════════════════════
 // TCD — CONSTRUCTEUR
