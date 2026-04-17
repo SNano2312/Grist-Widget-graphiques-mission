@@ -87,6 +87,14 @@ canvas{max-height:240px;cursor:pointer}
 .gbar{height:3px;background:var(--bdr);border-radius:2px;margin:5px 0;overflow:hidden}
 .gfill{height:100%;background:var(--bl);border-radius:2px;transition:width .3s}
 .empty{text-align:center;padding:48px;color:var(--tx3);font-size:13px}
+.filter-bar{display:flex;align-items:center;gap:10px;padding:8px 20px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap}
+.filter-bar-label{font-size:12px;font-weight:600;color:var(--tx2);white-space:nowrap}
+.filter-chips{display:flex;flex-wrap:wrap;gap:5px;flex:1}
+.filter-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:500;background:var(--bll);color:var(--bl);border:1px solid var(--blm);cursor:pointer;transition:background .1s}
+.filter-chip:hover{background:#D8E6F8}
+.filter-chip.active{background:var(--bl);color:#fff;border-color:var(--bl)}
+.filter-chip .x{font-size:13px;opacity:.7;margin-left:2px}.filter-chip .x:hover{opacity:1}
+.filter-count{font-size:11px;color:var(--tx3);white-space:nowrap}
 @media(max-width:700px){.ch-grid{grid-template-columns:1fr}.pv-builder{grid-template-columns:1fr}}
 </style></head>
 <body>
@@ -102,6 +110,13 @@ canvas{max-height:240px;cursor:pointer}
   <div class="tab" onclick="go('pivot')">TCD</div>
   <div class="tab" onclick="go('charts')">Graphiques</div>
   <div class="tab" onclick="go('map');initMap()">Carte</div>
+</div>
+<div class="filter-bar" id="filterBar" style="display:none">
+  <span class="filter-bar-label">Orga :</span>
+  <div class="filter-chips" id="filterChips"></div>
+  <button class="btn sm" id="filterAllBtn" onclick="filterSelectAll()" style="white-space:nowrap">Tout sélectionner</button>
+  <button class="btn sm" onclick="filterClearAll()" style="white-space:nowrap">Tout effacer</button>
+  <span class="filter-count" id="filterCount"></span>
 </div>
 <div class="content">
   <div class="loading" id="loadingEl"><div class="spinner"></div><div>Connexion à Grist…</div></div>
@@ -269,6 +284,97 @@ let dLevel=0, dF1=null, dF2=null, dRows=[], dCurPage=0;
 let leafMap=null, mapReady=false, mapMk=[], geoCache={};
 const PAL=['#1B4FBF','#1A7A4A','#B85C00','#8B2AB5','#B52626','#0D7A8C','#6D4C1F','#1A5F7A','#7A5C00','#4A1FA0'];
 
+// ── FILTRE GLOBAL ORGA ──
+let orgaValues=[];      // toutes les valeurs distinctes de Orga
+let orgaSelected=new Set(); // valeurs actuellement sélectionnées (vide = toutes)
+let RFiltered=[];       // R filtré par Orga — utilisé par tous les onglets
+
+// ── FILTRE GLOBAL ORGA ──
+function buildFilterBar(){
+  const orgaIdx=H.indexOf('Orga');
+  if(orgaIdx<0){RFiltered=[...R];return;}
+  // Récupérer les valeurs distinctes triées
+  orgaValues=[...new Set(R.map(r=>String(r[orgaIdx]||'').trim()))].filter(Boolean).sort();
+  orgaSelected=new Set(orgaValues); // tout sélectionné par défaut
+  document.getElementById('filterBar').style.display='flex';
+  renderFilterChips();
+  applyOrgaFilter();
+}
+
+function renderFilterChips(){
+  const container=document.getElementById('filterChips');
+  container.innerHTML='';
+  orgaValues.forEach(v=>{
+    const chip=document.createElement('span');
+    chip.className='filter-chip'+(orgaSelected.has(v)?' active':'');
+    chip.textContent=v;
+    chip.addEventListener('click',()=>toggleOrga(v));
+    container.appendChild(chip);
+  });
+  updateFilterCount();
+}
+
+function toggleOrga(v){
+  if(orgaSelected.has(v)) orgaSelected.delete(v);
+  else orgaSelected.add(v);
+  renderFilterChips();
+  applyOrgaFilter();
+  refreshAllTabs();
+}
+
+function filterSelectAll(){
+  orgaSelected=new Set(orgaValues);
+  renderFilterChips();
+  applyOrgaFilter();
+  refreshAllTabs();
+}
+
+function filterClearAll(){
+  orgaSelected=new Set();
+  renderFilterChips();
+  applyOrgaFilter();
+  refreshAllTabs();
+}
+
+function applyOrgaFilter(){
+  const orgaIdx=H.indexOf('Orga');
+  if(orgaIdx<0||orgaSelected.size===orgaValues.length){
+    RFiltered=[...R]; // pas de filtre = tout
+  } else if(orgaSelected.size===0){
+    RFiltered=[];
+  } else {
+    RFiltered=R.filter(r=>orgaSelected.has(String(r[orgaIdx]||'').trim()));
+  }
+  updateFilterCount();
+}
+
+function updateFilterCount(){
+  const total=R.length;
+  const filtered=RFiltered.length;
+  const el=document.getElementById('filterCount');
+  if(filtered===total){
+    el.textContent=total.toLocaleString('fr-FR')+' enregistrements';
+  } else {
+    el.textContent=filtered.toLocaleString('fr-FR')+' / '+total.toLocaleString('fr-FR')+' enregistrements';
+    el.style.color='var(--bl)';
+    el.style.fontWeight='600';
+  }
+}
+
+function refreshAllTabs(){
+  // Rafraîchir tous les onglets avec RFiltered
+  buildOverview();
+  FR=[...RFiltered];SR=[...RFiltered];tSortCol=-1;tSortDir=1;tCurPage=0;
+  // Reset les filtres texte de l'onglet Table
+  document.getElementById('tSearch').value='';
+  document.getElementById('tColF').value='';
+  document.getElementById('tValF').value='';
+  renderTable();
+  buildPivot();
+  resetDrills();
+  // Carte : ne pas recharger automatiquement (géocodage long)
+}
+
 // ── GRIST ──
 function initGrist(){
   if(typeof grist==='undefined'){setTimeout(loadDemo,400);return;}
@@ -333,9 +439,12 @@ function loadDemo(){
 
 function loaded(){
   document.getElementById('loadingEl').style.display='none';
+  RFiltered=[...R];
   FR=[...R];SR=[...R];tSortCol=-1;tSortDir=1;tCurPage=0;
   document.getElementById('topBadge').textContent=R.length.toLocaleString('fr-FR')+' enregistrements';
+  document.getElementById('topBadge').title='Utilisez le filtre Orga pour restreindre l\'analyse';
   document.getElementById('lastUpdate').textContent='Mis à jour '+new Date().toLocaleTimeString('fr-FR');
+  buildFilterBar();
   buildOverview();
   buildTableControls();renderTable();
   buildPivotUI();
@@ -360,13 +469,13 @@ function fmtDate(v){
 
 function buildOverview(){
   const stats=[
-    {label:'Enregistrements',val:R.length.toLocaleString('fr-FR'),sub:'total lignes'},
+    {label:'Enregistrements',val:RFiltered.length.toLocaleString('fr-FR'),sub:'total lignes filtré'},
     {label:'Colonnes',val:H.length,sub:'champs disponibles'},
   ];
   // Une stat par colonne montant
   H.forEach((h,i)=>{
     if(!isNum(i))return;
-    const sum=R.reduce((s,r)=>{const v=r[i];return s+(typeof v==='number'?v:(parseFloat(v)||0));},0);
+    const sum=RFiltered.reduce((s,r)=>{const v=r[i];return s+(typeof v==='number'?v:(parseFloat(v)||0));},0);
     stats.push({label:lbl(h),val:Math.round(sum).toLocaleString('fr-FR')+' €',sub:'total cumulé'});
   });
   document.getElementById('statsGrid').innerHTML=stats.map(s=>`
@@ -377,7 +486,7 @@ function buildOverview(){
     </div>`).join('');
   // Aperçu table (format dates)
   let h='<thead><tr>'+H.map(c=>`<th>${lbl(c)}</th>`).join('')+'</tr></thead><tbody>';
-  R.slice(0,20).forEach(r=>{
+  RFiltered.slice(0,20).forEach(r=>{
     h+='<tr>'+r.map((v,i)=>{
       const disp=H[i].includes('date')||H[i].includes('Date')||H[i].includes('Creation')||H[i].includes('realise')?fmtDate(String(v)):v;
       return `<td title="${String(v).replace(/"/g,'')}">${disp}</td>`;
@@ -404,7 +513,8 @@ function doFilter(){
   const q=document.getElementById('tSearch').value.toLowerCase();
   const ci=document.getElementById('tColF').value;
   const cv=document.getElementById('tValF').value.toLowerCase();
-  FR=R.filter(r=>{
+  // Le filtre Table s'applique sur RFiltered (déjà filtré par Orga)
+  FR=RFiltered.filter(r=>{
     if(q&&!r.some(v=>String(v).toLowerCase().includes(q)))return false;
     if(ci!==''&&cv&&!String(r[+ci]).toLowerCase().includes(cv))return false;
     return true;
@@ -544,7 +654,7 @@ function buildPivot(){
   const vField=pvV[0].idx;
 
   const map={},rKs=new Set(),cKs=new Set();
-  R.forEach(r=>{
+  RFiltered.forEach(r=>{
     const rk=rFields.length?rFields.map(i=>String(r[i]??'')).join(' | '):'(tout)';
     const ck=cFields.length?cFields.map(i=>String(r[i]??'')).join(' | '):'';
     rKs.add(rk);cKs.add(ck);
@@ -658,9 +768,9 @@ function buildCharts(rows,level){
   updateBC();
 }
 
-function resetDrills(){dLevel=0;dF1=null;dF2=null;dRows=[];dCurPage=0;document.getElementById('drillPanel').style.display='none';buildCharts(R,0);updateBC();}
+function resetDrills(){dLevel=0;dF1=null;dF2=null;dRows=[];dCurPage=0;document.getElementById('drillPanel').style.display='none';buildCharts(RFiltered,0);updateBC();}
 function drillUp(){
-  if(dLevel===2){dLevel=1;dF2=null;dCurPage=0;document.getElementById('drillPanel').style.display='none';const{xI}=gCtrl();buildCharts(R.filter(r=>String(r[xI]??'')==dF1),1);}
+  if(dLevel===2){dLevel=1;dF2=null;dCurPage=0;document.getElementById('drillPanel').style.display='none';const{xI}=gCtrl();buildCharts(RFiltered.filter(r=>String(r[xI]??'')==dF1),1);}
   else if(dLevel===1){resetDrills();}
   updateBC();
 }
@@ -730,7 +840,7 @@ async function geocode(place){
 async function reloadMap(){
   if(!leafMap){initMap();return;}
   const ci=+document.getElementById('mapCol').value;
-  const cnt={};R.forEach(r=>{const v=String(r[ci]||'').trim();if(v)cnt[v]=(cnt[v]||0)+1;});
+  const cnt={};RFiltered.forEach(r=>{const v=String(r[ci]||'').trim();if(v)cnt[v]=(cnt[v]||0)+1;});
   const dests=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
   mapMk.forEach(m=>leafMap.removeLayer(m));mapMk=[];
   const maxC=Math.max(...dests.map(d=>d[1]),1);
