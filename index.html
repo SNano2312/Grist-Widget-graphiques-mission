@@ -492,7 +492,18 @@ function rmZone(z,idx){
 function renderChips(z){
   const arr={r:pvR,c:pvC,v:pvV}[z];
   const el=document.getElementById({r:'zRows',c:'zCols',v:'zVals'}[z]);
-  el.innerHTML=arr.map(x=>`<span class="chip${z==='v'?' num':''}">${x.label}<span class="x" onclick="rmZone('${z}','${x.idx}')">×</span></span>`).join('');
+  el.innerHTML='';
+  arr.forEach(x=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(z==='v'?' num':'');
+    chip.textContent=x.label;
+    const btn=document.createElement('span');
+    btn.className='x';
+    btn.textContent='×';
+    btn.addEventListener('click',()=>{ rmZone(z,x.idx); });
+    chip.appendChild(btn);
+    el.appendChild(chip);
+  });
 }
 function resetPivot(){pvR=[];pvC=[];pvV=[];['r','c','v'].forEach(z=>renderChips(z));document.getElementById('pvResult').innerHTML='';}
 
