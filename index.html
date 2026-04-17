@@ -148,8 +148,8 @@ canvas{max-height:240px;cursor:pointer}
             </div>
           </div>
           <div class="pv-zone">
-            <div class="pv-zone-title">∑ Valeurs à calculer</div>
-            <div class="pv-zone-desc">Montants disponibles : Total_train, Total_avion, Total_hebergement, Montant_avance, Total_IJ_non_degreves… ou Comptage</div>
+            <div class="pv-zone-title">∑ Valeur à calculer <span style="font-weight:400;text-transform:none;font-size:10px">(1 seule — remplace la précédente)</span></div>
+            <div class="pv-zone-desc">Montants : Total_train, Total_avion, Total_hebergement, Montant_avance… ou Comptage</div>
             <div class="zone-chips" id="zVals"></div>
             <select id="selV" onchange="addZone('v')" style="margin-top:7px;width:280px"><option value="">+ Ajouter une valeur</option></select>
           </div>
@@ -480,7 +480,14 @@ function addZone(z){
   const val=sel.value;if(!val)return;
   const label=val==='_count'?'Comptage':lbl(H[+val]);
   const arr={r:pvR,c:pvC,v:pvV}[z];
-  if(arr.find(x=>x.idx===val))return;
+  // Valeurs : une seule à la fois — remplace l'existante
+  if(z==='v'){
+    pvV=[{idx:val,label}];
+    sel.value='';renderChips('v');buildPivot();
+    return;
+  }
+  // Lignes/Colonnes : plusieurs autorisées mais pas de doublon
+  if(arr.find(x=>x.idx===val)){sel.value='';return;}
   arr.push({idx:val,label});
   sel.value='';renderChips(z);buildPivot();
 }
